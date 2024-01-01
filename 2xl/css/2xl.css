@@ -1,0 +1,56 @@
+body {
+    text-align: center;
+    color: white;
+    background-color: black;
+}
+
+#panel {
+    display: flex;
+    background-color: lightgrey;
+    margin: 20px;
+    padding: 20px;
+    border-radius: 25px;
+}
+
+#tapecontrol {
+    display: flex;
+    justify-content: center;
+}
+
+.tapeButton {
+    text-align: center;
+    margin: 20px;
+    padding: 10px;
+    border-radius: 10px;
+    background-color: lightskyblue;
+    color: black;
+}
+
+.bigButton {
+    text-align: center;
+    margin: auto;
+    padding: 5px;
+    color: black;
+    border-radius: 5px;
+}
+
+.unclicked {
+    outline: outset;
+    outline-style: bold;
+    outline-width: 5px;
+    outline-color: darkblue;
+    background-color: gold;
+}
+
+.clicked {
+    outline: inset;
+    outline-style: bold;
+    outline-width: 5px;
+    outline-color: darkblue;
+    background-color: rgb(212, 180, 0);
+}
+
+/* For potential future styling use */
+/* .button {  
+
+} */
