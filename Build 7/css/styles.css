@@ -1,0 +1,234 @@
+/* Your CSS will go here */
+#game-container {
+    position: relative;
+    width: 800px;  /* Fixed width */
+    height: 600px; /* Fixed height */
+    overflow: hidden;
+    border: 2px solid #000;
+    /* Optional: Center the game container */
+    margin: 20px auto;
+}
+.background {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    animation: fade 2s;
+}
+#clickBlockerImg {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+}
+#fade-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: black;
+    opacity: 0; /* Start invisible */
+    pointer-events: none; /* Ensure it doesn't interfere with clicks */
+    transition: opacity 0.3s;
+    z-index: 100; /* Make sure it's above everything else */
+}
+#fade-overlay.active {
+    opacity: 1; /* Fade to black (visible) when active */
+}
+
+.clickable {
+    position: absolute;
+    cursor: pointer;
+}
+.clickable:hover {
+    filter: brightness(1.50);
+}
+
+.navigation {
+    position: absolute;
+    cursor: url('https://media.discordapp.net/attachments/1283563910603210783/1351624169904930927/footprints_w32.png?ex=6822e75a&is=682195da&hm=c4684b256f329f58034511fe9b37ccf0a301aef3e6eb895f214da10814663cb9&'), pointer;
+}
+
+
+/* ============= */
+/* DIALOGUE      */
+/* ============= */
+
+#dialogue {
+    cursor: default;
+    /* Will the above prevent me from using a pointer cursor over clickable choice buttons in this window? */
+    /* Or should specifying a pointer on those children elements take priority? */
+    display: block;
+    /* Display would be "none" if we wanted to have it simply appear, no animation */
+    position: absolute;
+    opacity: 0;
+    bottom: 50px;
+    left: 50%;
+    -ms-transform: translate(-50%, 0%);
+    transform: translate(-50%, 0%);
+    background: rgba(62, 68, 64, 0.8);
+    color: white;
+    padding: 10px;
+    border: 1px solid #7be9a9;
+    border-radius: 5px;
+    max-width: 300px;
+    /* prevent dialogue text from being selectable */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
+}
+
+#dialogue.active {
+    display: block;
+    opacity: 1;
+    -webkit-transition: 1s;
+    -moz-transition: 1s;
+    -ms-transition: 1s;
+    -o-transition: 1s;
+    transition: 1s;
+    margin-bottom: 15% !important;
+}
+
+#dialogue.h4 {
+    background: rgb(68, 116, 85);
+    color: white;
+    font-family: Arial, Helvetica, sans-serif;
+
+}
+
+.npc-name {
+    font-size: 18px; /* Adjust as necessary */
+    font-weight: bold;
+    color: #7be9a9; /* Use any color you want for the name card */
+    margin-bottom: 5; /* If you want to avoid margins */
+    margin-top: -5px;
+    padding: 5px; /* Add some padding as needed */
+    background-color: rgba(0, 0, 0, 0.5); /* Optional: background to distinguish it */
+    border-radius: 5px; /* Rounded edges for the name card */
+    text-align: center;    /* Center the text */
+    display: inline-block;
+}
+
+#dialogue-text {
+    text-align: center; /* This centers the content inside this container */
+}
+
+#dialogue {
+    text-align: center;
+    display: flex;
+    flex-direction: column;  /* Stack buttons vertically */
+    align-items: center;      /* Center buttons horizontally */
+    justify-content: center;   /* Optional: center vertically */
+    min-width: 100px;
+}
+
+#dialogue-options button {
+    display: inline-block;
+    margin: 5px;            /* Adds space between buttons */
+    /* Add any additional button styles here */
+}
+
+
+
+/* ============= */
+/* INVENTORY     */
+/* ============= */
+
+#inventory {
+    display: block;
+    position: absolute;
+    width: 850px;
+    height: 200px;
+    top: 600px;
+    left: -10px;
+    background: rgba(62, 68, 64, 1);
+    color: #e7e7e7;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    border: 4px solid #7be9a9;
+    padding: 10px;
+    box-shadow: 0 -4px 8px #0000005e;
+    
+}
+
+#inventory.active {
+    top: 500px;
+    -webkit-transition: 1s;
+    -moz-transition: 1s;
+    -ms-transition: 1s;
+    -o-transition: 1s;
+    transition: 1s;
+}
+
+#itemsName {
+    display: block;
+    position: relative;
+    bottom: 64px;
+    left: -5px;
+    width: 70px;
+    padding-right: 5px;
+    padding-left: 8px;
+    padding-bottom: 6px;
+    padding-top: 2px;
+    background: rgba(62, 68, 64, 1);
+    border-top: 4px solid #7be9a9;
+    border-right: 4px solid #7be9a9;
+    border-top-right-radius: 5px;
+    box-shadow: 0 -4px 8px #0000005e;
+    /* prevent text from being selectable */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
+    cursor: pointer;
+}
+
+#inventoryItems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px; /* Space between items */
+    padding-top: 0;
+    transform: translateY(-65px);
+}
+
+.inventory-item {
+    width: 60px; /* Uniform item width */
+    height: 60px; /* Uniform item height */
+    background-color: #e7e7e7;
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.inventory-item:hover {
+    transform: translateY(-2px); /* Subtle hover effect */
+}
+
+.inventory-item img {
+    width: 100%; /* Fit image within the item container */
+    height: 100%; 
+    object-fit: cover; /* Ensure the image covers the entire container */
+}
+
+
+/* ============= */
+/* VIDEO PLAYER  */
+/* ============= */
+
+#videoPlayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none; /* Start hidden */
+    background-color: rgba(0, 0, 0, 0.8); /* Optional, to emphasize video appearance*/
+    /* z-index: 1000; /* Ensure it overlays other elements */
+}
+
+#videoPlayer video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Scale video to cover the area */
+}

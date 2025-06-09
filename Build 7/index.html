@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/styles.css">
+    <title>Welcome to StereoStar Devices!</title>
+
+</head>
+<body>
+    <div id="game-container">
+        <img id="background" class="background" src="images/intro1.png" alt="Background">
+        <!-- Will need to figure out how to handle removing and re-populating diff chars and objects -->
+        <div id="clickablesDiv">  
+        </div>
+        <!-- Add Inventory window at this line (done) -->
+        <div id="inventory">
+            <h3 id="itemsName">ITEMS</h3>
+            <div id="inventoryItems"></div> <!-- Container for the inventory items -->
+        </div>
+        
+        <div id="clickBlockerDiv"></div>
+        <div id="dialogue">
+            <p id="dialogue-text"></p>
+            <div id="dialogue-options" style="display: none;"></div>
+            <button id="dialogue-next" style="display: none;">Next</button>
+        </div>
+        <!-- Will need to figure out how to handle removing and re-populating unique nav arrows/icons -->
+        
+        <button id="inventory-button" class="clickable" style="top: 10px; right: 10px;">Items</button>
+        <button id="test-button" class="clickable" style="top: 10px; left: 10px;">Video Test</button>
+        
+        <div id="videoPlayer"></div>
+        <div id="fade-overlay"><img id="blackScreenImg" src="images/black.png" alt="blackScreenImg"></div>
+    </div>
+    <script src="scripts/main.js"></script>
+    
+</body>
+</html>
