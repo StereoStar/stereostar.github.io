@@ -152,11 +152,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateJack2() {
-        clickablesBox.innerHTML += '<img id="jack2" class="clickable" src="images/jack-idle-1.gif" alt="Jack 2" style="top: 150px; left: 155px; height: 70%; ">';
+        clickablesBox.innerHTML += '<img id="jack2" class="clickable" src="images/jack-idle-2.gif" alt="Jack 2" style="top: 150px; left: 155px; height: 70%; ">';
     }
 
     function populateJack3() {
-        clickablesBox.innerHTML += '<img id="jack3" class="clickable" src="images/jack-idle-1.gif" alt="Jack 3" style="top: 160px; left: 35px; height: 70%; ">';
+        clickablesBox.innerHTML += '<img id="jack3" class="clickable" src="images/jack-idle-3.gif" alt="Jack 3" style="top: 145px; left: 42px; height: 67%; ">';
     }
 
     function populateSofia() {
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateJack4() {
-        clickablesBox.innerHTML += '<img id="jack4" class="clickable" src="images/jack-idle-1.gif" alt="Jack 4" style="top: 160px; left: 35px; height: 70%; ">';
+        clickablesBox.innerHTML += '<img id="jack4" class="clickable" src="images/jack-idle-4.gif" alt="Jack 4" style="top: 205px; left: 265px; height: 55%; ">';
     }
 
 
@@ -342,11 +342,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Test function to add to inventory
-    document.getElementById('inventory-button').addEventListener('click', () => {
-        addToInventory('object1');
-        console.log('object1 added to inventory!');
-        console.log(`Inventory contents: ${inventory}`);
-    });
+    //document.getElementById('inventory-button').addEventListener('click', () => {
+    //    addToInventory('object1');
+    //    console.log('object1 added to inventory!');
+    //    console.log(`Inventory contents: ${inventory}`);
+    //});
 
 
     // Function to remove an item from the inventory
@@ -1027,8 +1027,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         { text: "They said it wouldn't sell.", name: "SOFIA" },
                         { text: "I couldn’t believe it.  'Market was too small,' they explained helpfully.", name: "SOFIA" },
                         { text: "And they can say that, you know?  They’re writing the checks.", name: "SOFIA" },
-                        { text: "So I stewed for a while, and I can’t really tell if… I don’t know, if I’ve cooled off or I’m still simmering, I guess.", name: "SOFIA" },
-                        { text: "But the thing I can say is that I got a lot more willing to do one-offs when people ask.  It’s why I agreed to make Jack his soda cannon.", name: "SOFIA" },
+                        { text: "So I stewed for a while, and I can’t really tell if… I don’t know, if I’ve cooled off or if I’m still simmering, I guess.", name: "SOFIA" },
+                        { text: "But the thing I CAN say is that I got a lot more willing to do one-offs when people ask.  It’s why I agreed to make Jack his soda cannon.", name: "SOFIA" },
+                        "Jack blurts in.",
                         { text: "THANK YOU AGAIN, BY THE WAY", name: "JACK" },
                         { text: "I assure you, I am going to launch so many sodas with this thing.", name: "JACK" },
                         "Sofia continues.",
@@ -1057,8 +1058,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         { text: "They said it wouldn't sell.", name: "SOFIA" },
                         { text: "I couldn’t believe it.  'Market was too small,' they explained helpfully.", name: "SOFIA" },
                         { text: "And they can say that, you know?  They’re writing the checks.", name: "SOFIA" },
-                        { text: "So I stewed for a while, and I can’t really tell if… I don’t know, if I’ve cooled off or I’m still simmering, I guess.", name: "SOFIA" },
-                        { text: "But the thing I can say is that I got a lot more willing to do one-offs when people ask.  It’s why I agreed to make Jack his soda cannon.", name: "SOFIA" },
+                        { text: "So I stewed for a while, and I can’t really tell if… I don’t know, if I’ve cooled off or if I’m still simmering, I guess.", name: "SOFIA" },
+                        { text: "But the thing I CAN say is that I got a lot more willing to do one-offs when people ask.  It’s why I agreed to make Jack his soda cannon.", name: "SOFIA" },
+                        "Jack blurts in.",
                         { text: "THANK YOU AGAIN, BY THE WAY", name: "JACK" },
                         { text: "I assure you, I am going to launch so many sodas with this thing.", name: "JACK" },
                         "Sofia continues.",
@@ -1107,7 +1109,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         { text: "At New Year's, we even came down here, wrote our problems on scraps of wood, and threw them in.", name: "JACK" },
                         { text: "...That was my idea, of course.", name: "JACK" },
                         { text: "As the Social Engineer, it's my job to make sure things are compelling.", name: "JACK" },
-                        { text: "You know when you say you're going to put your phone down, and then fifteen minutes later you're still on it?", name: "JACK" },
+                        { text: "You know when you say you're going to put your phone down, and then fifteen minutes later, you're still on it?", name: "JACK" },
                         { text: "I did that.", name: "JACK" },
                         { text: "Sorry for pulling your leg about the CEO thing, by the way.", name: "JACK" },
                         { text: "Nobody knows who the actual CEO is.", name: "JACK" },
