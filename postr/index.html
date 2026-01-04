@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Clicker Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Welcome to Postr!</h1>
+
+  <div id="game">
+
+    <div id="feed-container">
+    <h2>Your Feed :)</h2>
+    <div id="feed-panel">
+        <div id="feed-inner">
+        <!-- Posts will be injected here -->
+        </div>
+    </div>
+    </div>
+
+
+    <p>Fucks: <span id="fuck-count">0</span></p>
+    <button id="click-button">Read a post</button>
+
+    <h2>Upgrades</h2>
+    <button id="upgrade-click" disabled>
+      Increase Empathy (+1 per click) — Give <span id="upgrade-cost">10</span> fucks
+    </button>
+
+    <button id="auto-clicker" disabled>
+      Unlock Autoscroll (+1 fuck/sec) — Give <span id="auto-cost">50</span> fucks
+    </button>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
