@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tuare v2</title>
+  <style>
+
+    /* ============================================================
+       BASE RESET & BODY
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: #1c3828;
+      color: #e8dcc8;
+      font-family: Georgia, "Times New Roman", serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ============================================================
+       HEADER
+    ============================================================ */
+    #header {
+      flex-shrink: 0;
+      background: #0e1f15;
+      border-bottom: 2px solid #c9a84c;
+      padding: 8px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #game-title {
+      font-size: 1.3rem;
+      color: #c9a84c;
+      letter-spacing: 3px;
+      font-variant: small-caps;
+    }
+
+    #stat-bar       { display: flex; gap: 18px; align-items: center; }
+    .stat           { text-align: center; }
+    .stat-lbl {
+      display: block;
+      font-size: 0.58rem;
+      color: #7a6a4a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .stat-val       { display: block; font-size: 1.05rem; font-weight: bold; }
+    .stat-val.gold  { color: #f0d878; }
+
+    #hearts         { display: flex; gap: 2px; font-size: 1.1rem; margin-top: 1px; }
+    .h-full         { color: #e53935; }
+    .h-empty        { color: #3a2828; }
+
+    .btn-reset {
+      padding: 5px 12px;
+      background: linear-gradient(#4a4a4a, #383838);
+      color: #c0c0c0;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .btn-reset:hover { filter: brightness(1.25); }
+
+    /* ============================================================
+       PROGRESS BAR
+    ============================================================ */
+    #progress-wrap {
+      flex-shrink: 0;
+      background: #0a1810;
+      border-bottom: 1px solid #1e3a22;
+      padding: 5px 20px;
+    }
+    #progress-track {
+      height: 7px;
+      background: #081408;
+      border-radius: 4px;
+      border: 1px solid #1e3a22;
+      overflow: hidden;
+    }
+    #progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2d7a48, #69f0ae);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    /* ============================================================
+       MAIN LAYOUT
+    ============================================================ */
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ============================================================
+       LEFT PANEL
+    ============================================================ */
+    #pile-panel {
+      flex-shrink: 0;
+      width: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 16px 8px;
+      background: rgba(0,0,0,0.15);
+      border-right: 1px solid #1e3a22;
+    }
+
+    .pile-group { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .pile-lbl   { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: #6a7a6a; }
+
+    .pile {
+      width: 72px;
+      height: 100px;
+      border-radius: 7px;
+      border: 2px dashed #2a4a30;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      color: #2a4a30;
+    }
+    .pile.filled { border-style: solid; }
+
+    .pile.deck-pile.filled {
+      background: linear-gradient(145deg, #1a347a, #0f2060);
+      border-color: #4a7adc;
+      color: #90b8f0;
+      box-shadow: 0 3px 10px rgba(0,0,60,0.5);
+    }
+    .pile.discard-pile.filled {
+      background: linear-gradient(145deg, #1a5c34, #0f3820);
+      border-color: #4ab064;
+      color: #90e0a4;
+      box-shadow: 0 3px 10px rgba(0,60,20,0.4);
+    }
+
+    .pile-num { font-size: 1.5rem; font-weight: bold; line-height: 1; }
+    .pile-sub { font-size: 0.55rem; text-transform: uppercase; opacity: 0.7; }
+
+    /* ============================================================
+       CENTER PANEL
+    ============================================================ */
+    #play-panel {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px 16px;
+      overflow-y: auto;
+    }
+
+    #cond-banner {
+      flex-shrink: 0;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid #2a4830;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      color: #a09060;
+      text-align: center;
+    }
+    #cond-banner strong { color: #d4b84c; }
+
+    #hand-area {
+      flex-shrink: 0;
+      background: rgba(0,0,0,0.18);
+      border: 2px dashed #2a4830;
+      border-radius: 10px;
+      padding: 14px;
+      min-height: 138px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    #hand-area.pass { border-color: #4caf50; box-shadow: 0 0 18px rgba(76,175,80,0.18); }
+    #hand-area.fail { border-color: #e53935; box-shadow: 0 0 18px rgba(229,57,53,0.15); }
+
+    /* ============================================================
+       PLAYING CARD
+    ============================================================ */
+    @keyframes dealCard {
+      from { opacity: 0; transform: translateY(-12px) scale(0.92); }
+      to   { opacity: 1; transform: translateY(0)     scale(1);    }
+    }
+
+    .card {
+      position: relative;
+      flex-shrink: 0;
+      width: 72px;
+      height: 102px;
+      background: #fffdf5;
+      border-radius: 7px;
+      border: 1px solid #ccc8b8;
+      box-shadow: 2px 3px 8px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.2);
+      user-select: none;
+      animation: dealCard 0.2s ease-out both;
+      transition: transform 0.15s;
+    }
+    .card:hover { transform: translateY(-6px) rotate(-1deg); }
+    .card.red   { color: #c41200; }
+    .card.black { color: #0d0d0d; }
+
+    .c-corner {
+      position: absolute;
+      font-size: 0.75rem;
+      font-weight: bold;
+      line-height: 1.2;
+      text-align: center;
+    }
+    .c-tl { top: 4px; left: 5px; }
+    .c-br { bottom: 4px; right: 5px; transform: rotate(180deg); }
+
+    .c-mid {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2rem;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    /* ============================================================
+       RESULT AREA
+    ============================================================ */
+    #result-area {
+      flex-shrink: 0;
+      background: rgba(0,0,0,0.22);
+      border-radius: 8px;
+      padding: 10px 14px;
+      min-height: 54px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+    }
+    #result-main { font-size: 0.95rem; font-weight: bold; }
+    #result-main.pass { color: #69f0ae; }
+    #result-main.fail { color: #ff6b6b; }
+    #result-main.idle { color: #5a7a5a; font-weight: normal; font-style: italic; }
+    #result-detail    { font-size: 0.78rem; color: #708070; }
+
+    /* ============================================================
+       BUTTONS
+    ============================================================ */
+    #btn-row {
+      flex-shrink: 0;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 9px 22px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    .btn:hover:not(:disabled)   { filter: brightness(1.2); transform: translateY(-2px); }
+    .btn:active:not(:disabled)  { transform: translateY(0); filter: brightness(0.9); }
+    .btn:disabled               { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-gold  { background: linear-gradient(#d4b048, #b89030); color: #1a1008; }
+    .btn-green { background: linear-gradient(#2e7a48, #246038); color: #9af0b4; }
+
+    /* ============================================================
+       ACTIVE RULES PANEL
+    ============================================================ */
+    #rules-panel {
+      background: rgba(0,0,0,0.18);
+      border: 1px solid #1e3822;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    #rules-title {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #6a7a5a;
+      margin-bottom: 6px;
+    }
+    #rules-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .rtag {
+      background: rgba(201,168,76,0.1);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      color: #c9a84c;
+    }
+
+    /* ============================================================
+       RIGHT PANEL — event log
+    ============================================================ */
+    #log-panel {
+      flex-shrink: 0;
+      width: 185px;
+      display: flex;
+      flex-direction: column;
+      background: rgba(0,0,0,0.15);
+      border-left: 1px solid #1e3a22;
+      padding: 14px 10px;
+      gap: 8px;
+      overflow: hidden;
+    }
+    #log-title {
+      flex-shrink: 0;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #6a7a5a;
+      border-bottom: 1px solid #1e3a22;
+      padding-bottom: 6px;
+    }
+    #log-entries {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    #log-entries::-webkit-scrollbar       { width: 4px; }
+    #log-entries::-webkit-scrollbar-track { background: transparent; }
+    #log-entries::-webkit-scrollbar-thumb { background: #2a4a30; border-radius: 4px; }
+
+    .log-e {
+      font-size: 0.72rem;
+      line-height: 1.35;
+      padding: 3px 5px;
+      border-radius: 3px;
+    }
+    .log-e.sys  { color: #7090a0; }
+    .log-e.ok   { color: #69f0ae; }
+    .log-e.bad  { color: #ff8a80; }
+    .log-e.rule { color: #ffd54f; background: rgba(255,213,79,0.06); }
+
+    /* ============================================================
+       MODAL — shared overlay
+    ============================================================ */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.78);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.on { display: flex; }
+
+    .modal-box {
+      background: linear-gradient(#182a1e, #101e14);
+      border: 2px solid #c9a84c;
+      border-radius: 14px;
+      padding: 26px;
+      width: 90%;
+      max-width: 520px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    }
+    .modal-box h2        { color: #c9a84c; font-size: 1.2rem; margin-bottom: 4px; }
+    .modal-subtitle      { font-size: 0.82rem; color: #7a8a7a; margin-bottom: 16px; }
+
+    #choice-cards { display: flex; flex-direction: column; gap: 10px; }
+
+    .choice {
+      border: 2px solid #2a4a30;
+      border-radius: 8px;
+      padding: 13px 15px;
+      cursor: pointer;
+      background: rgba(0,0,0,0.2);
+      transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    }
+    .choice:hover {
+      border-color: #c9a84c;
+      background: rgba(201,168,76,0.08);
+      transform: translateX(5px);
+    }
+    .choice h3 { color: #e8dcc8; font-size: 0.95rem; margin-bottom: 3px; }
+    .choice p  { color: #8a9a80; font-size: 0.8rem; line-height: 1.4; }
+
+    /* ============================================================
+       GAME-OVER MODAL
+    ============================================================ */
+    #gameover { z-index: 200; }
+
+    #go-box {
+      background: linear-gradient(#182a1e, #101e14);
+      border: 2px solid #c9a84c;
+      border-radius: 14px;
+      padding: 30px 36px;
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+    }
+    #go-title  { font-size: 2rem; margin-bottom: 14px; }
+    #go-stats  { color: #7a8a6a; font-size: 0.88rem; line-height: 2; margin-bottom: 20px; }
+    #go-stats strong { color: #e8dcc8; }
+
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════════════ -->
+  <div id="header">
+    <div id="game-title">⚔ Tuare ⚔</div>
+    <div id="stat-bar">
+      <div class="stat">
+        <span class="stat-lbl">Score</span>
+        <span class="stat-val gold" id="v-score">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-lbl">Lives</span>
+        <div id="hearts"></div>
+      </div>
+      <div class="stat">
+        <span class="stat-lbl">Wins</span>
+        <span class="stat-val" id="v-wins">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-lbl">Remaining</span>
+        <span class="stat-val" id="v-deck">52</span>
+      </div>
+
+      <!-- FIXED: removed onclick="initGame()" — wired up via addEventListener in JS instead -->
+      <button class="btn-reset" id="btn-new-game">New Game</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       DECK PROGRESS BAR
+  ═══════════════════════════════════════════════ -->
+  <div id="progress-wrap">
+    <div id="progress-track">
+      <div id="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN — three-column layout
+  ═══════════════════════════════════════════════ -->
+  <div id="main">
+
+    <!-- LEFT: pile visuals -->
+    <div id="pile-panel">
+      <div class="pile-group">
+        <div class="pile-lbl">Deck</div>
+        <div class="pile deck-pile filled" id="deck-pile">
+          <div class="pile-num" id="v-deck-pile">52</div>
+          <div class="pile-sub">cards</div>
+        </div>
+      </div>
+      <div class="pile-group">
+        <div class="pile-lbl">Cleared</div>
+        <div class="pile discard-pile" id="discard-pile">
+          <div class="pile-num" id="v-discard">0</div>
+          <div class="pile-sub">cards</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: the actual play area -->
+    <div id="play-panel">
+
+      <div id="cond-banner">
+        Success rule: <strong id="v-cond">Sum &gt; 15</strong>
+      </div>
+
+      <div id="hand-area"></div>
+
+      <div id="result-area">
+        <div id="result-main" class="idle">Draw a hand to begin...</div>
+        <div id="result-detail"></div>
+      </div>
+
+      <div id="btn-row">
+        <!-- FIXED: removed onclick="onDraw()" and onclick="onConfirm()" -->
+        <button class="btn btn-gold"  id="btn-draw">Draw Hand</button>
+        <button class="btn btn-green" id="btn-confirm" disabled>Confirm Hand</button>
+      </div>
+
+      <div id="rules-panel">
+        <div id="rules-title">Active Rules</div>
+        <div id="rules-tags"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: event log -->
+    <div id="log-panel">
+      <div id="log-title">Event Log</div>
+      <div id="log-entries"></div>
+    </div>
+
+  </div><!-- /#main -->
+
+
+  <!-- ═══════════════════════════════════════════════
+       MODAL — rule choice
+  ═══════════════════════════════════════════════ -->
+  <div class="overlay" id="choice-modal">
+    <div class="modal-box">
+      <h2>✦ Rule Evolution</h2>
+      <p class="modal-subtitle">
+        Your game grows. Pick one new rule to add — it takes effect immediately.
+      </p>
+      <div id="choice-cards"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       MODAL — game over
+  ═══════════════════════════════════════════════ -->
+  <div class="overlay" id="gameover">
+    <div id="go-box">
+      <div id="go-title"></div>
+      <div id="go-stats"></div>
+      <!-- FIXED: removed onclick="initGame()" — wired up via addEventListener in JS instead -->
+      <button class="btn btn-gold" id="btn-play-again">Play Again</button>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+       JAVASCRIPT
+  ═══════════════════════════════════════════════ -->
+  <script>
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  ROGUEBUILDER DECKLIKE                                           ║
+  // ║  A card game where you build the rules as you play.              ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  CONSTANTS
+  // ──────────────────────────────────────────────────────────────────
+
+  const SUITS = ['♠', '♥', '♦', '♣'];
+
+  const SUIT_NAMES = { '♠': 'Spades', '♥': 'Hearts', '♦': 'Diamonds', '♣': 'Clubs' };
+
+  const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+  // Numeric value assigned to each rank.
+  // Aces are high (11). Face cards are 10. Number cards are face value.
+  const RANK_VAL = {
+    'A': 11, '2': 2,  '3': 3, '4': 4,  '5': 5,
+    '6':  6, '7': 7,  '8': 8, '9': 9, '10': 10,
+    'J': 10, 'Q': 10, 'K': 10
+  };
+
+  // Which suits are red? Using a Set for fast .has() lookups.
+  const RED_SUITS = new Set(['♥', '♦']);
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  GAME STATE
+  //
+  //  G is the single source of truth for every piece of game data.
+  //  All functions read from and write to G.
+  //  It is fully replaced each time initGame() is called.
+  // ──────────────────────────────────────────────────────────────────
+
+  let G = {};   // populated by initGame()
+
+  /**
+   * Returns a brand-new game state object with default values.
+   * Keeping this as a function (rather than a plain object literal)
+   * makes it trivial to reset the game cleanly.
+   */
+  function freshState() {
+    return {
+      // ── Card piles ───────────────────────────────────────────────
+      deck:    [],    // Cards still waiting to be drawn
+      hand:    [],    // Cards currently in the player's hand
+      discard: [],    // Cards that have been cleared (spent)
+
+      // ── Progress trackers ────────────────────────────────────────
+      score:      0,
+      lives:      5,
+      maxLives:   5,
+      handsWon:   0,
+      handsLost:  0,
+      winStreak:  0,  // Consecutive wins without a failure
+
+      // ── Game phase ───────────────────────────────────────────────
+      // Controls which buttons are active and what the UI shows.
+      //   'idle'     → waiting for the player to draw
+      //   'drawn'    → hand is on the table, awaiting confirmation
+      //   'choosing' → rule-choice modal is open
+      //   'over'     → game has ended
+      phase: 'idle',
+
+      // ── Active parameters ────────────────────────────────────────
+      // These are the "rules" the player builds over the course of a run.
+      params: {
+        handSize:          5,            // Cards drawn per hand
+        pointsPerClear:   10,            // Base points earned on success
+        failPenalty:       5,            // Points lost (plus 1 life) on failure
+        successCondition: 'sumOver15',   // The key for the active success rule
+        bonusConditions:  [],            // Array of active bonus-rule keys
+        streakBonus:      false,         // Is the win-streak bonus rule active?
+      },
+
+      // ── Meta state ───────────────────────────────────────────────
+      choiceInterval: 3,     // Offer a new rule every N wins
+      usedRuleIds:    [],    // IDs of non-repeatable rules already chosen
+      log:            [],    // Array of { msg, type } objects (newest first)
+    };
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  RULE CATALOG
+  //
+  //  This array defines every parameter option the player can be
+  //  offered. To add a new rule, just add a new object here —
+  //  no other part of the code needs to change.
+  //
+  //  Each entry has:
+  //    id          – unique string key (used to prevent re-offering)
+  //    name        – short title shown in the modal
+  //    description – explanation shown in the modal
+  //    repeatable  – if true, can be offered more than once
+  //    apply(state)– function that mutates the game state to apply the effect.
+  //                  It receives the global G object as its argument.
+  // ──────────────────────────────────────────────────────────────────
+
+  const RULES = [
+
+    // ── Hand size ──────────────────────────────────────────────────
+    {
+      id: 'hand_up', name: 'Bigger Hand',
+      description: 'Draw 1 extra card per hand. More cards = wider range of possible values.',
+      repeatable: true,
+      apply: function(state) { state.params.handSize += 1; }
+    },
+    {
+      id: 'hand_down', name: 'Lean & Mean',
+      description: 'Draw 1 fewer card per hand (minimum 3). Reward: your base points per clear double.',
+      apply: function(state) {
+        state.params.handSize = Math.max(3, state.params.handSize - 1);
+        state.params.pointsPerClear *= 2;
+      }
+    },
+
+    // ── Points & lives ─────────────────────────────────────────────
+    {
+      id: 'pts_up', name: 'Score Booster',
+      description: 'Earn 10 more points per successful clear. Can be chosen multiple times!',
+      repeatable: true,
+      apply: function(state) { state.params.pointsPerClear += 10; }
+    },
+    {
+      id: 'pts_x2', name: 'Double Down',
+      description: 'Double your base points per clear. High risk, high reward.',
+      apply: function(state) { state.params.pointsPerClear *= 2; }
+    },
+    {
+      id: 'penalty_cut', name: 'Safety Net',
+      description: 'Halve the point penalty for failing a hand.',
+      apply: function(state) { state.params.failPenalty = Math.max(0, Math.floor(state.params.failPenalty / 2)); }
+    },
+    {
+      id: 'extra_life', name: 'Extra Life',
+      description: 'Gain 1 additional life (maximum 7 total).',
+      apply: function(state) {
+        state.lives    = Math.min(7, state.lives + 1);
+        state.maxLives = Math.min(7, state.maxLives + 1);
+      }
+    },
+    {
+      id: 'streak_bonus', name: 'Win Streak',
+      description: 'Earn +5 bonus points for each consecutive win. Resets to 0 on any failure.',
+      apply: function(state) { state.params.streakBonus = true; }
+    },
+
+    // ── Success conditions ─────────────────────────────────────────
+    // Choosing one of these replaces the current success condition.
+    {
+      id: 'cond_sum20', name: 'High Stakes',
+      description: 'New success rule: hand sum must exceed 20. Reward: +50% points per clear.',
+      apply: function(state) {
+        state.params.successCondition = 'sumOver20';
+        state.params.pointsPerClear = Math.floor(state.params.pointsPerClear * 1.5);
+      }
+    },
+    {
+      id: 'cond_pair', name: 'Pair Up',
+      description: 'New success rule: hand must contain at least one pair (two cards of the same rank).',
+      apply: function(state) { state.params.successCondition = 'hasPair'; }
+    },
+    {
+      id: 'cond_face', name: 'Face the Music',
+      description: 'New success rule: hand must contain at least one face card (J, Q, or K).',
+      apply: function(state) { state.params.successCondition = 'hasFaceCard'; }
+    },
+    {
+      id: 'cond_ace', name: 'Ace Required',
+      description: 'New success rule: hand must contain an Ace. Reward: +20 points per clear.',
+      apply: function(state) {
+        state.params.successCondition = 'hasAce';
+        state.params.pointsPerClear += 20;
+      }
+    },
+    {
+      id: 'cond_suit', name: 'Suit Matcher',
+      description: 'New success rule: hand must contain at least 2 cards of the same suit.',
+      apply: function(state) { state.params.successCondition = 'twoSameSuit'; }
+    },
+    {
+      id: 'cond_even', name: 'Even Steven',
+      description: 'New success rule: hand sum must be an even number. Reward: double points.',
+      apply: function(state) {
+        state.params.successCondition = 'sumEven';
+        state.params.pointsPerClear *= 2;
+      }
+    },
+    {
+      id: 'cond_low', name: 'Low Road',
+      description: 'New success rule: hand sum must stay below 20. Reward: +15 points per clear.',
+      apply: function(state) {
+        state.params.successCondition = 'sumUnder20';
+        state.params.pointsPerClear += 15;
+      }
+    },
+
+    // ── Bonus conditions ───────────────────────────────────────────
+    // These stack on top of the success condition and multiply points
+    // when the hand also meets the bonus criteria.
+    {
+      id: 'bon_red', name: 'Seeing Red',
+      description: 'Bonus: if every card in your hand is red (♥ ♦), earn double points.',
+      apply: function(state) { state.params.bonusConditions.push('allRed'); }
+    },
+    {
+      id: 'bon_black', name: 'In the Black',
+      description: 'Bonus: if every card in your hand is black (♠ ♣), earn double points.',
+      apply: function(state) { state.params.bonusConditions.push('allBlack'); }
+    },
+    {
+      id: 'bon_flush', name: 'Going for the Flush',
+      description: 'Bonus: if all cards share the same suit, earn triple points.',
+      apply: function(state) { state.params.bonusConditions.push('allSameSuit'); }
+    },
+    {
+      id: 'bon_no_face', name: "Commoner's Touch",
+      description: 'Bonus: if your hand has no face cards (J/Q/K) at all, earn double points.',
+      apply: function(state) { state.params.bonusConditions.push('noFaceCard'); }
+    },
+    {
+      id: 'bon_pair_pts', name: 'Pair Pays',
+      description: 'Bonus: if your hand contains a pair, earn an extra +10 points.',
+      apply: function(state) { state.params.bonusConditions.push('pairBonus'); }
+    },
+
+    // ── Meta / structural ──────────────────────────────────────────
+    {
+      id: 'more_choices', name: 'Rule Hunger',
+      description: 'Get offered a new rule 1 win sooner in each cycle (minimum: every 1 win).',
+      apply: function(state) { state.choiceInterval = Math.max(1, state.choiceInterval - 1); }
+    },
+
+  ]; // end RULES
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  DECK UTILITIES
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Builds an ordered 52-card deck.
+   * Each card is a plain object: { rank, suit, value, id }
+   */
+  function makeDeck() {
+    return SUITS.flatMap(function(suit) {
+      return RANKS.map(function(rank) {
+        return { rank: rank, suit: suit, value: RANK_VAL[rank], id: rank + suit };
+      });
+    });
+  }
+
+  /**
+   * Fisher-Yates shuffle — the standard unbiased shuffle algorithm.
+   * Modifies the array in-place and also returns it for easy chaining.
+   * @param {Array} arr
+   * @returns {Array}
+   */
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = temp;
+    }
+    return arr;
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  HAND EVALUATION HELPERS
+  //
+  //  Small, focused functions that answer specific questions about a hand.
+  //  Keep these pure (no side effects) so they can safely be called
+  //  both for actual resolution and for live preview rendering.
+  // ──────────────────────────────────────────────────────────────────
+
+  /** Returns the sum of all card values in the hand. */
+  function sumHand(hand) {
+    return hand.reduce(function(n, c) { return n + c.value; }, 0);
+  }
+
+  /** Returns true if the hand contains at least one pair (same rank). */
+  function hasPair(hand) {
+    var seen = {};
+    for (var i = 0; i < hand.length; i++) {
+      if (seen[hand[i].rank]) { return true; }
+      seen[hand[i].rank] = true;
+    }
+    return false;
+  }
+
+  /** Returns true if the hand contains at least one J, Q, or K. */
+  function hasFaceCard(hand) {
+    return hand.some(function(c) { return 'JQK'.indexOf(c.rank) !== -1; });
+  }
+
+  /** Returns true if the hand contains at least one Ace. */
+  function hasAce(hand) {
+    return hand.some(function(c) { return c.rank === 'A'; });
+  }
+
+  /** Returns true if at least n cards in the hand share the same suit. */
+  function hasNSameSuit(hand, n) {
+    var counts = {};
+    for (var i = 0; i < hand.length; i++) {
+      counts[hand[i].suit] = (counts[hand[i].suit] || 0) + 1;
+      if (counts[hand[i].suit] >= n) { return true; }
+    }
+    return false;
+  }
+
+  // Colour helpers
+  function allRed(hand)      { return hand.every(function(c) { return  RED_SUITS.has(c.suit); }); }
+  function allBlack(hand)    { return hand.every(function(c) { return !RED_SUITS.has(c.suit); }); }
+  function allSameSuit(hand) { return hand.every(function(c) { return c.suit === hand[0].suit; }); }
+
+  /**
+   * Evaluates a hand against a named success condition.
+   *
+   * @param {Object[]} hand  Array of card objects
+   * @param {string}   cond  The successCondition key from G.params
+   * @returns {{ pass: boolean, reason: string }}
+   */
+  function evalHand(hand, cond) {
+    var sum = sumHand(hand);
+    var passed;
+
+    // Add a new 'case' here whenever you create a new success condition.
+    switch (cond) {
+      case 'sumOver15':
+        return { pass: sum > 15,  reason: 'Sum is ' + sum + ' — need > 15' };
+      case 'sumOver20':
+        return { pass: sum > 20,  reason: 'Sum is ' + sum + ' — need > 20' };
+      case 'sumUnder20':
+        return { pass: sum < 20,  reason: 'Sum is ' + sum + ' — need < 20' };
+      case 'sumEven':
+        return { pass: sum % 2 === 0, reason: 'Sum is ' + sum + ' — need even' };
+      case 'hasPair':
+        passed = hasPair(hand);
+        return { pass: passed, reason: passed ? 'Contains a pair!'  : 'No pairs found' };
+      case 'hasFaceCard':
+        passed = hasFaceCard(hand);
+        return { pass: passed, reason: passed ? 'Has a face card!'  : 'No face cards' };
+      case 'hasAce':
+        passed = hasAce(hand);
+        return { pass: passed, reason: passed ? 'Contains an Ace!' : 'No Ace in hand' };
+      case 'twoSameSuit':
+        passed = hasNSameSuit(hand, 2);
+        return { pass: passed, reason: passed ? '2 cards share a suit!' : 'No suit matches' };
+      default:
+        return { pass: true, reason: 'Auto-pass (no condition set)' };
+    }
+  }
+
+  /**
+   * Calculates the total points earned for a successful hand,
+   * including any active bonus-condition multipliers.
+   *
+   * @param {Object[]} hand
+   * @param {Object}   params  G.params
+   * @returns {{ points: number, bonuses: string[] }}
+   */
+  function calcPoints(hand, params) {
+    var pts = params.pointsPerClear;
+    var bonuses = [];
+
+    // Check each active bonus condition
+    for (var i = 0; i < params.bonusConditions.length; i++) {
+      var b = params.bonusConditions[i];
+      if (b === 'allRed'      && allRed(hand))       { pts *= 2;  bonuses.push('All Red ×2'); }
+      if (b === 'allBlack'    && allBlack(hand))      { pts *= 2;  bonuses.push('All Black ×2'); }
+      if (b === 'allSameSuit' && allSameSuit(hand))   { pts *= 3;  bonuses.push('Full Flush ×3'); }
+      if (b === 'noFaceCard'  && !hasFaceCard(hand))  { pts *= 2;  bonuses.push('No Faces ×2'); }
+      if (b === 'pairBonus'   && hasPair(hand))       { pts += 10; bonuses.push('Pair +10'); }
+    }
+
+    // Streak bonus — uses the streak count before this hand increments it,
+    // so that the preview in renderResult() always matches what onConfirm() awards.
+    if (params.streakBonus && G.winStreak > 0) {
+      var extra = G.winStreak * 5;
+      pts += extra;
+      bonuses.push('Streak ×' + G.winStreak + ' (+' + extra + ')');
+    }
+
+    return { points: Math.floor(pts), bonuses: bonuses };
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  GAME FLOW
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Called when the player clicks "Draw Hand".
+   * Takes the top N cards from G.deck and puts them in G.hand.
+   */
+  function onDraw() {
+    if (G.phase !== 'idle') { return; }   // safety guard
+    if (!G.deck.length) { addLog('The deck is empty!', 'sys'); return; }
+
+    var n = Math.min(G.params.handSize, G.deck.length);
+    G.hand  = G.deck.splice(0, n);
+    G.phase = 'drawn';
+
+    addLog('Drew ' + n + ' card' + (n !== 1 ? 's' : '') + '.', 'sys');
+    render();
+  }
+
+  /**
+   * Called when the player clicks "Confirm Hand".
+   * Locks in the result:
+   *   - Success → award points, advance win streak
+   *   - Failure → deduct points, deduct a life, break streak
+   * In both cases the hand cards are moved to the discard pile.
+   */
+  function onConfirm() {
+    if (G.phase !== 'drawn') { return; }  // safety guard
+
+    var result = evalHand(G.hand, G.params.successCondition);
+
+    if (result.pass) {
+      // ── Success path ─────────────────────────────────────────────
+      // calcPoints is called BEFORE incrementing winStreak so the
+      // streak bonus matches what the preview showed.
+      var calc   = calcPoints(G.hand, G.params);
+      var points = calc.points;
+      var bonuses = calc.bonuses;
+
+      G.score    += points;
+      G.handsWon++;
+      G.winStreak++;
+      G.discard  = G.discard.concat(G.hand);
+      G.hand     = [];
+
+      var msg = '✓ Cleared! +' + points + ' pts.  ' + result.reason;
+      if (bonuses.length) { msg += '  [' + bonuses.join(', ') + ']'; }
+      addLog(msg, 'ok');
+
+      // Every G.choiceInterval wins, open the rule-choice modal.
+      if (G.handsWon % G.choiceInterval === 0) {
+        G.phase = 'choosing';
+        render();
+        openChoiceModal();
+        return;   // pause here; afterHand() is called after the player picks
+      }
+
+    } else {
+      // ── Failure path ─────────────────────────────────────────────
+      G.score     = Math.max(0, G.score - G.params.failPenalty);
+      G.lives--;
+      G.handsLost++;
+      G.winStreak = 0;
+      G.discard   = G.discard.concat(G.hand);
+      G.hand      = [];
+
+      addLog('✗ Failed! -' + G.params.failPenalty + ' pts, -1 life.  ' + result.reason, 'bad');
+    }
+
+    afterHand();
+  }
+
+  /**
+   * Checks win/loss conditions after a hand resolves (or after a rule
+   * choice is made). Either ends the game or returns to idle.
+   */
+  function afterHand() {
+    if (G.lives <= 0) {
+      endGame(false);
+      return;
+    }
+    // Both deck AND hand must be empty for a true win
+    if (!G.deck.length && !G.hand.length) {
+      endGame(true);
+      return;
+    }
+    G.phase = 'idle';
+    render();
+  }
+
+  /**
+   * Opens the rule-choice modal with up to 3 randomly selected options.
+   * Filters out non-repeatable rules that have already been used.
+   */
+  function openChoiceModal() {
+    // Build the pool of available rules
+    var pool = RULES.filter(function(r) {
+      return r.repeatable || G.usedRuleIds.indexOf(r.id) === -1;
+    });
+
+    // Edge case: pool is somehow empty → resume play without a choice
+    if (!pool.length) {
+      addLog('No new rules available — continuing.', 'sys');
+      afterHand();
+      return;
+    }
+
+    // Shuffle and take up to 3
+    var shuffled = shuffle(pool.slice());   // .slice() copies so we don't sort RULES in place
+    var picks    = shuffled.slice(0, Math.min(3, shuffled.length));
+
+    // Build choice cards inside the modal
+    var container = document.getElementById('choice-cards');
+    container.innerHTML = '';
+
+    picks.forEach(function(rule) {
+      var el = document.createElement('div');
+      el.className = 'choice';
+      el.innerHTML = '<h3>' + rule.name + '</h3><p>' + rule.description + '</p>';
+      // Each card's click handler captures its own specific rule via closure
+      el.addEventListener('click', function() { pickRule(rule); });
+      container.appendChild(el);
+    });
+
+    document.getElementById('choice-modal').classList.add('on');
+  }
+
+  /**
+   * Applies the player's chosen rule, then resumes play.
+   * @param {Object} rule  An entry from the RULES array
+   */
+  function pickRule(rule) {
+    rule.apply(G);   // passes the global G as the 'state' argument
+
+    // Track usage so non-repeatable rules aren't offered again
+    if (G.usedRuleIds.indexOf(rule.id) === -1) {
+      G.usedRuleIds.push(rule.id);
+    }
+
+    addLog('New rule: "' + rule.name + '"', 'rule');
+    document.getElementById('choice-modal').classList.remove('on');
+
+    afterHand();
+  }
+
+  /**
+   * Ends the game and shows the game-over overlay.
+   * @param {boolean} won  true = player cleared the deck; false = out of lives
+   */
+  function endGame(won) {
+    G.phase = 'over';
+    render();
+
+    var titleEl = document.getElementById('go-title');
+    titleEl.textContent = won ? '🏆 Victory!' : '💀 Defeated';
+    titleEl.style.color = won ? '#c9a84c' : '#e53935';
+
+    document.getElementById('go-stats').innerHTML =
+      '<div>Final Score: <strong>' + G.score + '</strong></div>' +
+      '<div>Cards Cleared: <strong>' + G.discard.length + ' / 52</strong></div>' +
+      '<div>Hands Won: <strong>' + G.handsWon + '</strong>' +
+        '&nbsp;/&nbsp;Lost: <strong>' + G.handsLost + '</strong></div>' +
+      '<div>Rules Adopted: <strong>' + G.usedRuleIds.length + '</strong></div>';
+
+    addLog(won ? '🏆 Deck cleared — you win!' : '💀 Out of lives. Game over.',
+           won ? 'ok' : 'bad');
+
+    document.getElementById('gameover').classList.add('on');
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  LOGGING
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Adds a message to the event log (prepends so newest is on top)
+   * and immediately re-renders the log panel.
+   *
+   * @param {string} msg   The text to display
+   * @param {string} type  CSS class for colour: 'sys' | 'ok' | 'bad' | 'rule'
+   */
+  function addLog(msg, type) {
+    if (!type) { type = 'sys'; }
+    G.log.unshift({ msg: msg, type: type });
+    if (G.log.length > 80) { G.log.pop(); }
+    renderLog();
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  RENDER FUNCTIONS
+  //
+  //  Each function is responsible for ONE part of the UI.
+  //  The master render() calls them all.
+  // ──────────────────────────────────────────────────────────────────
+
+  /** Master render — call after any state change to sync the full UI. */
+  function render() {
+    renderStats();
+    renderPiles();
+    renderHand();
+    renderResult();
+    renderRules();
+    renderButtons();
+  }
+
+  /** Updates the header stats bar. */
+  function renderStats() {
+    document.getElementById('v-score').textContent = G.score;
+    document.getElementById('v-wins').textContent  = G.handsWon;
+    document.getElementById('v-deck').textContent  = G.deck.length;
+
+    // Build heart icons for the lives display
+    var heartsEl = document.getElementById('hearts');
+    var html = '';
+    for (var i = 0; i < G.maxLives; i++) {
+      html += '<span class="' + (i < G.lives ? 'h-full' : 'h-empty') + '">♥</span>';
+    }
+    heartsEl.innerHTML = html;
+
+    // Progress bar — what % of the 52-card deck has been cleared
+    document.getElementById('progress-fill').style.width =
+      (G.discard.length / 52 * 100) + '%';
+  }
+
+  /** Updates the deck-pile and discard-pile visual boxes. */
+  function renderPiles() {
+    document.getElementById('v-deck-pile').textContent = G.deck.length;
+    document.getElementById('v-discard').textContent   = G.discard.length;
+
+    // .filled toggles the coloured card-back appearance on/off
+    document.getElementById('deck-pile')
+            .classList.toggle('filled', G.deck.length > 0);
+    document.getElementById('discard-pile')
+            .classList.toggle('filled', G.discard.length > 0);
+  }
+
+  /**
+   * Re-renders the hand area.
+   * Shows a placeholder when no hand is drawn, otherwise builds card elements.
+   * Applies a green/red border highlight based on the current pass/fail state.
+   */
+  function renderHand() {
+    var area = document.getElementById('hand-area');
+    area.innerHTML = '';
+    area.classList.remove('pass', 'fail');
+
+    if (!G.hand.length) {
+      area.innerHTML = '<span style="color:#3a5a40;font-style:italic;font-size:.88rem">No hand drawn yet</span>';
+      return;
+    }
+
+    // Show green/red highlight while the hand is awaiting confirmation
+    if (G.phase === 'drawn') {
+      var evalResult = evalHand(G.hand, G.params.successCondition);
+      area.classList.add(evalResult.pass ? 'pass' : 'fail');
+    }
+
+    // Build a DOM element for each card with a staggered deal animation
+    G.hand.forEach(function(card, i) {
+      var el = makeCardEl(card);
+      el.style.animationDelay = (i * 0.06) + 's';
+      area.appendChild(el);
+    });
+  }
+
+  /**
+   * Builds a DOM element for a single playing card.
+   * @param {{ rank:string, suit:string, value:number, id:string }} card
+   * @returns {HTMLElement}
+   */
+  function makeCardEl(card) {
+    var isRed = RED_SUITS.has(card.suit);
+
+    var div = document.createElement('div');
+    div.className = 'card ' + (isRed ? 'red' : 'black');
+    div.title = card.rank + ' of ' + SUIT_NAMES[card.suit] + '  (value: ' + card.value + ')';
+
+    div.innerHTML =
+      '<div class="c-corner c-tl">' + card.rank + '<br>' + card.suit + '</div>' +
+      '<div class="c-mid">' + card.suit + '</div>' +
+      '<div class="c-corner c-br">' + card.rank + '<br>' + card.suit + '</div>';
+
+    return div;
+  }
+
+  /**
+   * Updates the result area below the hand.
+   * 'drawn' phase → shows pass/fail and projected points or penalty.
+   * 'idle' phase  → shows a prompt.
+   */
+  function renderResult() {
+    var mainEl   = document.getElementById('result-main');
+    var detailEl = document.getElementById('result-detail');
+
+    if (G.phase === 'drawn' && G.hand.length) {
+      var evalResult = evalHand(G.hand, G.params.successCondition);
+      var calc       = calcPoints(G.hand, G.params);
+
+      // FIXED: use classList for clean class management instead of overwriting className
+      mainEl.classList.remove('idle', 'pass', 'fail');
+      mainEl.classList.add(evalResult.pass ? 'pass' : 'fail');
+      mainEl.textContent = (evalResult.pass ? '✓ ' : '✗ ') + evalResult.reason;
+
+      if (evalResult.pass) {
+        var detail = 'Confirm to earn +' + calc.points + ' point' + (calc.points !== 1 ? 's' : '');
+        if (calc.bonuses.length) { detail += '  [' + calc.bonuses.join(', ') + ']'; }
+        detailEl.textContent = detail;
+      } else {
+        detailEl.textContent = 'Confirm to lose −' + G.params.failPenalty + ' pts and 1 life';
+      }
+
+    } else {
+      // FIXED: use classList for clean class management
+      mainEl.classList.remove('pass', 'fail');
+      mainEl.classList.add('idle');
+      mainEl.textContent   = G.deck.length ? 'Draw a hand to continue...' : 'Deck is empty!';
+      detailEl.textContent = '';
+    }
+  }
+
+  /**
+   * Updates the "Active Rules" panel and the condition banner.
+   */
+  function renderRules() {
+    var p = G.params;
+    var winsUntilChoice = G.choiceInterval - (G.handsWon % G.choiceInterval);
+
+    var tags = [
+      '🃏 Hand size: ' + p.handSize,
+      '🎯 Goal: ' + condLabel(p.successCondition),
+      '✨ +' + p.pointsPerClear + ' pts / clear',
+      '💔 −' + p.failPenalty + ' pts on fail',
+      '⏳ Next rule in ' + winsUntilChoice + ' win' + (winsUntilChoice !== 1 ? 's' : ''),
+    ];
+
+    if (p.streakBonus) {
+      tags.push('🔥 Streak: ×' + G.winStreak +
+        ' (' + (G.winStreak > 0 ? '+' + (G.winStreak * 5) + ' next' : 'broken') + ')');
+    }
+
+    p.bonusConditions.forEach(function(b) { tags.push('⭐ ' + bonLabel(b)); });
+
+    document.getElementById('rules-tags').innerHTML =
+      tags.map(function(t) { return '<span class="rtag">' + t + '</span>'; }).join('');
+
+    document.getElementById('v-cond').textContent = condLabel(p.successCondition);
+  }
+
+  /** Enables or disables action buttons based on the current game phase. */
+  function renderButtons() {
+    document.getElementById('btn-draw').disabled    = G.phase !== 'idle' || !G.deck.length;
+    document.getElementById('btn-confirm').disabled = G.phase !== 'drawn';
+  }
+
+  /** Re-renders all entries in the event log panel. */
+  function renderLog() {
+    document.getElementById('log-entries').innerHTML =
+      G.log.map(function(e) {
+        return '<div class="log-e ' + e.type + '">' + e.msg + '</div>';
+      }).join('');
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  LABEL HELPERS
+  //
+  //  Centralising display strings here means you only need to add one
+  //  line when you create a new condition or bonus.
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns a short human-readable label for a success-condition key.
+   * @param {string} id  A successCondition key
+   * @returns {string}
+   */
+  function condLabel(id) {
+    var MAP = {
+      sumOver15:   'Sum > 15',
+      sumOver20:   'Sum > 20',
+      sumUnder20:  'Sum < 20',
+      sumEven:     'Sum is Even',
+      hasPair:     'Contains a Pair',
+      hasFaceCard: 'Has a Face Card',
+      hasAce:      'Has an Ace',
+      twoSameSuit: '2+ Same Suit',
+    };
+    return MAP[id] || id;   // fall back to raw key if not found
+  }
+
+  /**
+   * Returns a short human-readable label for a bonus-condition key.
+   * @param {string} id  A bonusConditions key
+   * @returns {string}
+   */
+  function bonLabel(id) {
+    var MAP = {
+      allRed:      'All Red → ×2 pts',
+      allBlack:    'All Black → ×2 pts',
+      allSameSuit: 'Full Flush → ×3 pts',
+      noFaceCard:  'No Face Cards → ×2 pts',
+      pairBonus:   'Pair → +10 pts',
+    };
+    return MAP[id] || id;
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  INITIALISATION
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Starts a completely fresh game.
+   * Resets all state, creates and shuffles a new deck, closes any open
+   * overlays, logs the opening message, then does a full render.
+   *
+   * Called on page load and by the "New Game" / "Play Again" buttons.
+   */
+  function initGame() {
+    G      = freshState();
+    G.deck = shuffle(makeDeck());
+
+    document.getElementById('gameover').classList.remove('on');
+    document.getElementById('choice-modal').classList.remove('on');
+
+    addLog('Deck shuffled — good luck!', 'sys');
+    addLog('Starting rule: ' + condLabel(G.params.successCondition) + '.', 'sys');
+    addLog('Win ' + G.choiceInterval + ' hands to choose your first new rule.', 'sys');
+
+    render();
+  }
+
+
+  // ──────────────────────────────────────────────────────────────────
+  //  FIXED: Wire up all button event listeners here, in JavaScript,
+  //  instead of using inline onclick="" attributes in the HTML.
+  //  This avoids scope issues in VS Code's preview and other
+  //  sandboxed browser environments.
+  // ──────────────────────────────────────────────────────────────────
+  document.getElementById('btn-new-game').addEventListener('click', initGame);
+  document.getElementById('btn-draw').addEventListener('click', onDraw);
+  document.getElementById('btn-confirm').addEventListener('click', onConfirm);
+  document.getElementById('btn-play-again').addEventListener('click', initGame);
+
+  // ── Start the game! ───────────────────────────────────────────────
+  initGame();
+
+  </script>
+</body>
+</html>
