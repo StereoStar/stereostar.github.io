@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keys on a Keyring</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { overflow: hidden; background: #0e0b08; }
+
+        canvas { display: block; cursor: default; }
+
+        /* ── Praise text overlay ───────────────────────────────── */
+        #praise-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 10;
+        }
+        .praise-text {
+            position: absolute;
+            font-family: Georgia, serif;
+            font-style: italic;
+            color: rgba(220, 180, 70, 0.72);
+            pointer-events: none;
+            white-space: nowrap;
+            /* max-width safety net: even very large text won't overflow
+               its own box and leak past the praise-layer's overflow:hidden */
+            max-width: calc(100vw - 32px);
+            animation: praiseAnim 1.7s ease-out forwards;
+        }
+        @keyframes praiseAnim {
+            0%   { opacity: 0;    transform: scale(0.82) translateY(0px);  }
+            12%  { opacity: 0.72; transform: scale(1)    translateY(0px);  }
+            41%  { opacity: 0.72; transform: scale(1)    translateY(0px);  }
+            100% { opacity: 0;    transform: scale(1.04) translateY(-28px);}
+        }
+
+        /* ── Hint & footer ─────────────────────────────────────── */
+        #hint {
+            position: fixed;
+            bottom: 38px;
+            width: 100%;
+            text-align: center;
+            font-family: Georgia, serif;
+            font-size: 13px;
+            letter-spacing: 2px;
+            color: rgba(220, 180, 70, 0.55);
+            pointer-events: none;
+            user-select: none;
+            animation: fadeHint 2.5s ease-in 4s forwards;
+        }
+        #footer {
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-family: Georgia, serif;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+            color: rgba(220, 180, 70, 0.25);
+            pointer-events: none;
+            user-select: none;
+        }
+        @keyframes fadeHint { to { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="praise-layer"></div>
+    <p id="hint">click the keys · they play a tune</p>
+    <p id="footer">Slopcoded with Claude 4.6 Sonnet</p>
+
+<script>
+// =============================================================
+//  KEYS ON A KEYRING
+// =============================================================
+//  §1   Canvas setup & resize
+//  §2   Utility helpers
+//  §3   Audio synthesis
+//  §4   Background drawing
+//  §5   Ring object
+//  §6   Key class
+//  §7   Melody & chord progression
+//  §8   Praise text system
+//  §9   Confetti system
+//  §10  Key definitions
+//  §11  Interaction
+//  §12  Animation loop
+//  §13  Initialise & start
+// =============================================================
+
+
+// ─────────────────────────────────────────────────────────────
+//  §1  CANVAS SETUP
+// ─────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+
+window.addEventListener('resize', () => {
+    resizeCanvas();
+    const p = RING_PAD;
+    ring.x       = clamp(ring.x,       p, canvas.width  - p);
+    ring.y       = clamp(ring.y,       p, canvas.height - p);
+    ring.targetX = clamp(ring.targetX, p, canvas.width  - p);
+    ring.targetY = clamp(ring.targetY, p, canvas.height - p);
+});
+
+
+// ─────────────────────────────────────────────────────────────
+//  §2  UTILITY HELPERS
+// ─────────────────────────────────────────────────────────────
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function shiftColor(hex, amt) {
+    const p = (i) => parseInt(hex.slice(i, i + 2), 16);
+    const [r, g, b] = [p(1), p(3), p(5)];
+    const ch = (c) =>
+        clamp(Math.round(c + 255 * amt), 0, 255)
+            .toString(16).padStart(2, '0');
+    return `#${ch(r)}${ch(g)}${ch(b)}`;
+}
+
+function rrect(c, x, y, w, h, r) {
+    r = clamp(r, 0, Math.min(w, h) / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.lineTo(x + w - r, y);
+    c.arcTo(x + w, y,     x + w, y + r,     r);
+    c.lineTo(x + w, y + h - r);
+    c.arcTo(x + w, y + h, x + w - r, y + h, r);
+    c.lineTo(x + r, y + h);
+    c.arcTo(x,     y + h, x,     y + h - r, r);
+    c.lineTo(x,     y + r);
+    c.arcTo(x,     y,     x + r, y,         r);
+    c.closePath();
+}
+
+function ptSegDist(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+    const t = clamp(((px - ax) * dx + (py - ay) * dy) / lenSq, 0, 1);
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §3  AUDIO SYNTHESIS
+// ─────────────────────────────────────────────────────────────
+
+let _audioCtx = null;
+const getAC = () => {
+    if (!_audioCtx)
+        _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return _audioCtx;
+};
+
+function playJingle(freq = 800, vol = 0.28, timeOffset = 0) {
+    const ac = getAC();
+    [
+        { ratio: 1.000, amp: 1.00 },
+        { ratio: 2.756, amp: 0.42 },
+        { ratio: 5.404, amp: 0.18 },
+        { ratio: 8.933, amp: 0.07 },
+    ].forEach(({ ratio, amp }, i) => {
+        const osc  = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.type            = 'sine';
+        osc.frequency.value = freq * ratio;
+        const t0 = ac.currentTime + timeOffset + i * 0.006;
+        const t1 = t0 + 0.55;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(vol * amp, t0 + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t1);
+        osc.start(t0);
+        osc.stop(t1 + 0.05);
+    });
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §4  BACKGROUND
+// ─────────────────────────────────────────────────────────────
+
+function drawBackground() {
+    const w = canvas.width, h = canvas.height;
+    const grad = ctx.createRadialGradient(
+        w / 2, h / 2, 0,
+        w / 2, h / 2, Math.hypot(w, h) / 2
+    );
+    grad.addColorStop(0,    '#28201a');
+    grad.addColorStop(0.55, '#1a1610');
+    grad.addColorStop(1,    '#0e0b08');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §5  RING
+// ─────────────────────────────────────────────────────────────
+
+const RING_R   = 28;
+const RING_PAD = 130;
+
+const ring = {
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    prevVx: 0, prevVy: 0,
+    targetX: 0, targetY: 0,
+    wanderTimer: 0, wanderInterval: 3000,
+    jerkOffset: 0,
+    jerkVel: 0,
+
+    init() {
+        this.x = canvas.width  / 2;
+        this.y = canvas.height / 2;
+        this.pickTarget();
+    },
+
+    pickTarget() {
+        const p = RING_PAD;
+        this.targetX        = p + Math.random() * (canvas.width  - p * 2);
+        this.targetY        = p + Math.random() * (canvas.height - p * 2);
+        this.wanderInterval = 2000 + Math.random() * 4500;
+        this.wanderTimer    = 0;
+    },
+
+    jerk() { this.jerkVel = -3.8; },
+
+    update(dt) {
+        this.prevVx = this.vx;
+        this.prevVy = this.vy;
+
+        this.wanderTimer += dt;
+        if (this.wanderTimer >= this.wanderInterval) this.pickTarget();
+
+        const dx = this.targetX - this.x, dy = this.targetY - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 8) {
+            const acc = 0.000065;
+            this.vx += (dx / dist) * acc * dt;
+            this.vy += (dy / dist) * acc * dt;
+        } else {
+            this.pickTarget();
+        }
+
+        const MAX_SPD = 0.09;
+        const spd = Math.hypot(this.vx, this.vy);
+        if (spd > MAX_SPD) {
+            this.vx = (this.vx / spd) * MAX_SPD;
+            this.vy = (this.vy / spd) * MAX_SPD;
+        }
+        this.vx *= 0.996;
+        this.vy *= 0.996;
+        this.x  += this.vx * dt;
+        this.y  += this.vy * dt;
+
+        const p = RING_PAD;
+        if (this.x < p)                 { this.x = p;                this.vx =  Math.abs(this.vx) * 0.5; }
+        if (this.x > canvas.width  - p) { this.x = canvas.width - p; this.vx = -Math.abs(this.vx) * 0.5; }
+        if (this.y < p)                 { this.y = p;                this.vy =  Math.abs(this.vy) * 0.5; }
+        if (this.y > canvas.height - p) { this.y = canvas.height- p; this.vy = -Math.abs(this.vy) * 0.5; }
+
+        if (this.jerkOffset !== 0 || this.jerkVel !== 0) {
+            const SPRING_K   = 0.045;
+            const DAMP_K     = 0.22;
+            const frameScale = dt / 16.67;
+            const acc        = -this.jerkOffset * SPRING_K - this.jerkVel * DAMP_K;
+            this.jerkVel    += acc * frameScale;
+            this.jerkOffset += this.jerkVel * frameScale;
+            if (Math.abs(this.jerkOffset) < 0.15 && Math.abs(this.jerkVel) < 0.15) {
+                this.jerkOffset = 0;
+                this.jerkVel    = 0;
+            }
+        }
+    },
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y + this.jerkOffset);
+
+        ctx.shadowColor   = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur    = 18;
+        ctx.shadowOffsetX = 4;
+        ctx.shadowOffsetY = 5;
+
+        const g = ctx.createLinearGradient(-RING_R, -RING_R, RING_R, RING_R);
+        g.addColorStop(0.0, '#f7e468');
+        g.addColorStop(0.3, '#d4a020');
+        g.addColorStop(0.7, '#9c6e10');
+        g.addColorStop(1.0, '#ddb832');
+
+        ctx.beginPath();
+        ctx.arc(0, 0, RING_R, 0, Math.PI * 2);
+        ctx.strokeStyle = g;
+        ctx.lineWidth   = 8;
+        ctx.stroke();
+
+        ctx.shadowColor = 'transparent';
+        ctx.beginPath();
+        ctx.arc(0, 0, RING_R - 2, Math.PI * 1.15, Math.PI * 1.75);
+        ctx.strokeStyle = 'rgba(255,255,210,0.55)';
+        ctx.lineWidth   = 3;
+        ctx.stroke();
+
+        ctx.restore();
+    },
+};
+
+
+// ─────────────────────────────────────────────────────────────
+//  §6  KEY CLASS
+// ─────────────────────────────────────────────────────────────
+
+class Key {
+    constructor(cfg) {
+        this.attachAngle = cfg.attachAngle;
+        this.type        = cfg.type;
+        this.color       = cfg.color;
+        this.accent      = cfg.accent || '#cccccc';
+        this.length      = cfg.length || 60;
+        this.scale       = cfg.scale  || 1.0;
+
+        this.bright = shiftColor(this.color,  0.28);
+        this.dark   = shiftColor(this.color, -0.38);
+
+        this.angle  = (Math.random() - 0.5) * 0.18;
+        this.angVel = 0;
+
+        this.GRAV    = 0.00024;
+        this.DAMP_60 = 0.9820;
+        this.MAX_ANG = Math.PI * 0.52;
+        this.glow    = 0;
+    }
+
+    attachPt() {
+        return {
+            x: ring.x + Math.cos(this.attachAngle) * RING_R,
+            y: ring.y + ring.jerkOffset + Math.sin(this.attachAngle) * RING_R,
+        };
+    }
+
+    update(dt) {
+        const accelX  = ring.vx - ring.prevVx;
+        const gravTq  = -this.GRAV * Math.sin(this.angle);
+        const inertTq = -accelX * 0.004;
+        this.angVel += (gravTq + inertTq) * dt;
+        this.angVel *= Math.pow(this.DAMP_60, dt / 16.67);
+        this.angle  += this.angVel * dt;
+        if (Math.abs(this.angle) > this.MAX_ANG) {
+            this.angle  =  Math.sign(this.angle) * this.MAX_ANG;
+            this.angVel *= -0.3;
+        }
+        if (this.glow > 0) this.glow = Math.max(0, this.glow - dt * 0.0016);
+    }
+
+    activate(glowAmount = 1.0, impulse = 0.030) {
+        this.angVel += (Math.random() - 0.5) * impulse;
+        this.glow    = glowAmount;
+    }
+
+    containsPoint(px, py) {
+        const a = this.attachPt();
+        const s = this.scale;
+        const botX = a.x + Math.sin(this.angle) * (this.length + 4) * s;
+        const botY = a.y + Math.cos(this.angle) * (this.length + 4) * s;
+        return ptSegDist(px, py, a.x, a.y, botX, botY) < 18 * s;
+    }
+
+    draw() {
+        const a = this.attachPt();
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(this.angle);
+        if (this.glow > 0) {
+            ctx.shadowColor   = this.bright;
+            ctx.shadowBlur    = 24 * this.glow;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        } else {
+            ctx.shadowColor   = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur    = 10;
+            ctx.shadowOffsetX = 3;
+            ctx.shadowOffsetY = 4;
+        }
+        switch (this.type) {
+            case 'classic':  this._classic();  break;
+            case 'modern':   this._modern();   break;
+            case 'skeleton': this._skeleton(); break;
+            case 'car':      this._car();      break;
+            case 'padlock':  this._padlock();  break;
+            case 'small':    this._small();    break;
+            default:         this._classic();
+        }
+        ctx.restore();
+    }
+
+    _classic() {
+        const s = this.scale, L = this.length;
+        const br = 13 * s;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.rect(-4 * s, 0, 8 * s, L * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        [[0.18, 9, 7], [0.36, 6, 7], [0.54, 11, 7], [0.74, 7, 7]].forEach(([t, h, w]) => {
+            ctx.beginPath();
+            ctx.rect(4 * s, t * L * s, w * s, h * s);
+            ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+            ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+        });
+        ctx.beginPath();
+        ctx.arc(0, -br * 0.7, br, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, -br * 0.7, br * 0.46, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-br * 0.38, -br * 1.1, br * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill();
+    }
+
+    _modern() {
+        const s = this.scale, L = this.length;
+        const bw = 20 * s, bh = 18 * s;
+        ctx.lineWidth = 1.5;
+        rrect(ctx, -bw / 2, -bh, bw, bh, 5 * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        rrect(ctx, -bw / 2 + 5 * s, -bh + 5 * s, bw - 10 * s, bh - 10 * s, 3 * s);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.rect(-5.5 * s, 0, 11 * s, L * 0.62 * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.rect(-3 * s, L * 0.62 * s, 6 * s, L * 0.38 * s);
+        ctx.fillStyle = this.dark; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        [[0.20, 10, 5], [0.42, 13, 5]].forEach(([t, w, h]) => {
+            ctx.beginPath();
+            ctx.rect(5.5 * s, t * L * s, w * s, h * s);
+            ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+            ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+        });
+    }
+
+    _skeleton() {
+        const s = this.scale, L = this.length;
+        const br  = 18 * s;
+        const bcy = -br * 0.9;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(-2.5 * s, 0, 5 * s, L * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        [[-10, 0.68, 8, 5], [-8, 0.82, 6, 5]].forEach(([bx, t, bw, bh]) => {
+            ctx.beginPath();
+            ctx.rect(bx * s, t * L * s, bw * s, bh * s);
+            ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+            ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+        });
+        ctx.beginPath();
+        ctx.arc(0, bcy, br, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, bcy, br * 0.58, 0, Math.PI * 2);
+        ctx.strokeStyle = this.dark; ctx.lineWidth = 2 * s; ctx.stroke();
+        ctx.strokeStyle = this.dark; ctx.lineWidth = 1.5 * s;
+        for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * br * 0.22, bcy + Math.sin(a) * br * 0.22);
+            ctx.lineTo(Math.cos(a) * br * 0.56, bcy + Math.sin(a) * br * 0.56);
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(0, bcy, br * 0.14, 0, Math.PI * 2);
+        ctx.fillStyle = this.dark; ctx.fill();
+    }
+
+    _car() {
+        const s = this.scale, L = this.length;
+        const fw = 18 * s, fh = 28 * s;
+        ctx.lineWidth = 1.5;
+        rrect(ctx, -fw / 2, 0, fw, fh, 7 * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, fh * 0.30, 5 * s, 0, Math.PI * 2);
+        ctx.fillStyle = this.accent; ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, fh * 0.58, 3.5 * s, 0, Math.PI * 2);
+        ctx.fillStyle = shiftColor(this.accent, -0.2); ctx.fill();
+        ctx.beginPath();
+        ctx.rect(-5 * s, fh * 0.80, 10 * s, 2 * s);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fill();
+        const bladeStart = fh + 2 * s;
+        const bladeLen   = L * s - bladeStart;
+        if (bladeLen > 0) {
+            ctx.beginPath();
+            ctx.rect(-2.5 * s, bladeStart, 5 * s, bladeLen);
+            ctx.fillStyle = '#b0b0b0'; ctx.strokeStyle = '#777';
+            ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+            [0.25, 0.52, 0.76].forEach(t => {
+                ctx.beginPath();
+                ctx.rect(2.5 * s, bladeStart + t * bladeLen, 4 * s, 3 * s);
+                ctx.fillStyle = '#888'; ctx.fill();
+            });
+        }
+    }
+
+    _padlock() {
+        const s = this.scale, L = this.length;
+        const br = 11 * s;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.rect(-4 * s, 0, 8 * s, L * 0.65 * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        [[0.18, 1, 8, 5], [0.36, -1, 6, 5], [0.52, 1, 8, 4]].forEach(([t, sd, w, h]) => {
+            ctx.beginPath();
+            ctx.rect(sd > 0 ? 4 * s : -(4 + w) * s, t * L * s, w * s, h * s);
+            ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+            ctx.lineWidth = 1; ctx.fill(); ctx.stroke();
+        });
+        ctx.beginPath();
+        ctx.arc(0, -br * 0.7, br, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.lineWidth = 1.5; ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, -br * 0.7, br * 0.48, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+    }
+
+    _small() {
+        const s = this.scale, L = this.length;
+        const br = 9 * s;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(-2.5 * s, 0, 5 * s, L * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.rect(2.5 * s, L * 0.46 * s, 7 * s, 4 * s);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, -br * 0.6, br, 0, Math.PI * 2);
+        ctx.fillStyle = this.color; ctx.strokeStyle = this.dark;
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, -br * 0.6, br * 0.48, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §7  MELODY & CHORD PROGRESSION
+// ─────────────────────────────────────────────────────────────
+
+const MARY_NOTES = [
+    330, 294, 262, 294, 330, 330, 330,
+    294, 294,  294,
+    330, 392,  392,
+    330, 294, 262, 294, 330, 330, 330, 330,
+    294, 294,  330, 294,  262,
+];
+
+const MARY_CHORDS = [
+    'C', 'G', 'C', 'G', 'C', 'C', 'C',
+    'G', 'G',  'G',
+    'C', 'C',  'C',
+    'C', 'G', 'C', 'G', 'C', 'C', 'C', 'C',
+    'G', 'G',  'C', 'G',  'C',
+];
+
+const CHORD_ROOTS = { 'C': 262, 'G': 196 };
+
+let noteIndex = 0;
+
+function consumeNote() {
+    const melody    = MARY_NOTES[noteIndex];
+    const root      = CHORD_ROOTS[MARY_CHORDS[noteIndex]];
+    noteIndex++;
+    const completed = noteIndex >= MARY_NOTES.length;
+    if (completed) noteIndex = 0;
+    return { melody, root, completed };
+}
+
+const REWARD_URL = 'https://arxiv.org/abs/2604.04721';
+
+function openReward() {
+    const tab = window.open('', '_blank');
+    if (tab) { setTimeout(() => { tab.location.href = REWARD_URL; }, 900); }
+    else      { setTimeout(() => { window.open(REWARD_URL, '_blank'); }, 900); }
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §8  PRAISE TEXT
+// ─────────────────────────────────────────────────────────────
+//
+//  On every click a word of praise is spawned as a DOM <span>
+//  inside #praise-layer.  A CSS animation handles the
+//  fade-in / hold / fade-out lifecycle.
+//
+//  HOW SAFE POSITIONING WORKS
+//  ──────────────────────────
+//  We must know the element's rendered width and height before
+//  we can choose a position that keeps it fully on screen.
+//  The trick: append the element to the DOM first (it starts
+//  invisible because the CSS animation begins at opacity: 0),
+//  then immediately read `offsetWidth` / `offsetHeight`.
+//  Reading those properties forces the browser to perform a
+//  synchronous layout right now, in the same JS task, before
+//  any frame is painted.  We use the measured dimensions to
+//  calculate a random position that keeps every edge inside
+//  the viewport, then set left/top.  The browser paints for
+//  the first time only after this JS task finishes, so the
+//  element always appears at its final position.
+// ─────────────────────────────────────────────────────────────
+
+const PRAISE_LAYER = document.getElementById('praise-layer');
+
+const PRAISE_WORDS = [
+    'Wow!', 'Great!', "You're doing so good!",
+    'Beautiful!', 'Keep going!', 'Lovely!',
+    'Yes!', 'Wonderful!', 'Amazing!',
+    'Pure magic!', 'Perfect!', 'Brilliant!',
+    'Gorgeous!', 'Encore!', 'Superb!',
+];
+
+const PRAISE_SIZE_START = 26;  // px — starting font size    (TWEAK)
+const PRAISE_SIZE_STEP  =  5;  // px added per click         (TWEAK)
+const PRAISE_EDGE_PAD   = 16;  // px — minimum gap from edge (TWEAK)
+
+let praiseSize = PRAISE_SIZE_START;
+
+/**
+ * Spawn one praise word at a safe, fully on-screen position.
+ *
+ * Size grows by PRAISE_SIZE_STEP each call and resets when
+ * the melody completes.
+ */
+function spawnPraise() {
+    const word = PRAISE_WORDS[Math.floor(Math.random() * PRAISE_WORDS.length)];
+    const el   = document.createElement('span');
+    el.className   = 'praise-text';
+    el.textContent = word;
+    el.style.fontSize = praiseSize + 'px';
+
+    // Position temporarily at (0, 0) — invisible at this moment
+    // because the CSS animation's first keyframe is opacity: 0.
+    el.style.left = '0px';
+    el.style.top  = '0px';
+    PRAISE_LAYER.appendChild(el);
+
+    // Force synchronous layout so we can read true dimensions.
+    const elW = el.offsetWidth;
+    const elH = el.offsetHeight;
+
+    // The usable region is the viewport minus padding on all sides
+    // and minus the element's own size so the far edge stays in.
+    // Math.max(0, …) guards against an element that is somehow
+    // wider than the viewport (very long text at huge font size).
+    const safeW = Math.max(0, window.innerWidth  - elW - PRAISE_EDGE_PAD * 2);
+    const safeH = Math.max(0, window.innerHeight - elH - PRAISE_EDGE_PAD * 2);
+
+    el.style.left = (PRAISE_EDGE_PAD + Math.random() * safeW) + 'px';
+    el.style.top  = (PRAISE_EDGE_PAD + Math.random() * safeH) + 'px';
+
+    // Clean up the DOM node a little after the 1.7 s animation ends.
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1900);
+
+    praiseSize += PRAISE_SIZE_STEP;
+}
+
+/** Called on melody reset — font size returns to the starting value. */
+function resetPraise() { praiseSize = PRAISE_SIZE_START; }
+
+
+// ─────────────────────────────────────────────────────────────
+//  §9  CONFETTI
+// ─────────────────────────────────────────────────────────────
+//
+//  Locked for the first half of the melody (notes 0–12).
+//  Unlocks at note 13 and stays unlocked until melody resets.
+//
+//  AMOUNT — triples each trigger: 3 → 9 → 27 → 81 → 243 → 729,
+//  then caps at 729 (= 3^6).
+//
+//  SPREAD — grows by CONFETTI_SPREAD_STEP each trigger, capping
+//  at CONFETTI_SPREAD_MAX.  Both the spawn-offset radius and the
+//  initial launch speed scale with the spread value, so pieces
+//  fly further from the ring as the crowd grows.  This prevents
+//  the dense later bursts from just piling up on top of each
+//  other.
+//
+//  On melody reset: amount and spread both return to their start
+//  values; pieces already in the air complete their natural arc.
+// ─────────────────────────────────────────────────────────────
+
+const CONFETTI_COLORS = [
+    '#f7e468', '#e84040', '#5aaad2', '#80b838',
+    '#c07828', '#a8b8c8', '#ff88cc', '#ffaa44',
+];
+
+const CONFETTI_MAX_TOTAL   = 1500;  // performance cap on total live pieces
+const CONFETTI_MAX_BATCH   = 729;   // per-trigger cap (= 3^6)
+const CONFETTI_GRAVITY     = 0.00045; // px / ms²  (TWEAK)
+
+// Spread constants — control how far pieces originate from and
+// fly away from the ring as the burst size grows.
+const CONFETTI_SPREAD_START = 25;   // px — spawn-radius at first trigger (TWEAK)
+const CONFETTI_SPREAD_STEP  = 45;   // px added to spread each trigger     (TWEAK)
+const CONFETTI_SPREAD_MAX   = 250;  // px — spread cap (at 6th trigger)    (TWEAK)
+
+const confettiPieces   = [];
+let confettiNextAmount  = 3;
+let confettiUnlocked    = false;
+let confettiSpreadRadius = CONFETTI_SPREAD_START;
+
+/**
+ * Launch `count` confetti pieces from near the ring.
+ *
+ * Spawn position: scattered within a circle of confettiSpreadRadius
+ * centred on the ring, so pieces start already dispersed rather
+ * than all launching from the same point.
+ *
+ * Launch speed: also scales with spread, so at higher tiers pieces
+ * travel much further before gravity brings them down.
+ *
+ * Both effects together give a natural "bigger explosion" look
+ * without pieces just piling up on top of one another.
+ */
+function spawnConfetti(count) {
+    const room  = CONFETTI_MAX_TOTAL - confettiPieces.length;
+    const toAdd = Math.min(count, room);
+
+    // Normalised 0…1 value representing how far along the spread
+    // progression we are.  Used to interpolate speed ranges.
+    const spreadT = clamp(
+        (confettiSpreadRadius - CONFETTI_SPREAD_START) /
+        (CONFETTI_SPREAD_MAX  - CONFETTI_SPREAD_START),
+        0, 1
+    );
+
+    for (let i = 0; i < toAdd; i++) {
+        // Fan of angles: straight up ± 75°, biased upward
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.5;
+
+        // Speed range grows with spread:
+        //   tier 1 (spreadT≈0): 0.12 – 0.40 px/ms
+        //   tier 6 (spreadT=1): 0.35 – 0.75 px/ms
+        const minSpd = 0.12 + spreadT * 0.23;
+        const maxSpd = 0.40 + spreadT * 0.35;
+        const speed  = minSpd + Math.random() * (maxSpd - minSpd);
+
+        confettiPieces.push({
+            // Spawn scattered across a disc of radius confettiSpreadRadius
+            x: ring.x + (Math.random() - 0.5) * confettiSpreadRadius * 2,
+            y: ring.y + ring.jerkOffset + (Math.random() - 0.5) * confettiSpreadRadius,
+            vx:       Math.cos(angle) * speed,
+            vy:       Math.sin(angle) * speed,
+            w:        5   + Math.random() * 6,
+            h:        2.5 + Math.random() * 3,
+            color:    CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.008,
+            opacity:  1,
+            age:      0,
+            maxAge:   2000 + Math.random() * 1500,
+        });
+    }
+}
+
+/** Advance all confetti physics by dt milliseconds. */
+function updateConfetti(dt) {
+    for (let i = confettiPieces.length - 1; i >= 0; i--) {
+        const c = confettiPieces[i];
+        c.vy       += CONFETTI_GRAVITY * dt;
+        c.x        += c.vx * dt;
+        c.y        += c.vy * dt;
+        c.rotation += c.rotSpeed * dt;
+        c.age      += dt;
+        // Fade out over the last 30% of each piece's lifespan
+        const ratio = c.age / c.maxAge;
+        c.opacity   = ratio > 0.7 ? Math.max(0, 1 - (ratio - 0.7) / 0.3) : 1;
+        if (c.age >= c.maxAge || c.y > canvas.height + 40) {
+            confettiPieces.splice(i, 1);
+        }
+    }
+}
+
+/** Draw all active confetti pieces. */
+function drawConfetti() {
+    confettiPieces.forEach(c => {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.rotate(c.rotation);
+        ctx.globalAlpha = c.opacity;
+        ctx.fillStyle   = c.color;
+        ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+        ctx.restore();
+    });
+    ctx.globalAlpha = 1;
+}
+
+/**
+ * Trigger one burst of confetti at the current tier, then
+ * advance both the batch size and spread for the next trigger.
+ */
+function triggerConfetti() {
+    spawnConfetti(confettiNextAmount);
+    confettiNextAmount   = Math.min(confettiNextAmount   * 3,    CONFETTI_MAX_BATCH);
+    confettiSpreadRadius = Math.min(confettiSpreadRadius + CONFETTI_SPREAD_STEP, CONFETTI_SPREAD_MAX);
+}
+
+/**
+ * Called on melody reset.
+ * Relocks confetti until the user reaches the halfway point again;
+ * resets batch size and spread to their starting values.
+ * Pieces already in the air are left to finish their arcs.
+ */
+function resetConfetti() {
+    confettiUnlocked     = false;
+    confettiNextAmount   = 3;
+    confettiSpreadRadius = CONFETTI_SPREAD_START;
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §10  KEY DEFINITIONS
+// ─────────────────────────────────────────────────────────────
+
+const KEY_DEFS = [
+    { attachAngle: Math.PI * 0.05, type: 'classic',  color: '#d4a820',               length: 68, scale: 1.0  },
+    { attachAngle: Math.PI * 0.38, type: 'modern',   color: '#5aaad2',               length: 58, scale: 0.95 },
+    { attachAngle: Math.PI * 0.70, type: 'skeleton', color: '#c07828',               length: 72, scale: 1.05 },
+    { attachAngle: Math.PI * 1.05, type: 'padlock',  color: '#a8b8c8',               length: 48, scale: 0.88 },
+    { attachAngle: Math.PI * 1.38, type: 'car',      color: '#1e2030', accent: '#e84040', length: 65, scale: 1.0  },
+    { attachAngle: Math.PI * 1.72, type: 'small',    color: '#80b838',               length: 44, scale: 0.85 },
+];
+
+const keys = KEY_DEFS.map(def => new Key(def));
+
+
+// ─────────────────────────────────────────────────────────────
+//  §11  INTERACTION
+// ─────────────────────────────────────────────────────────────
+
+function handleClick(px, py) {
+    // Unlock confetti once we reach the second half of the melody
+    if (!confettiUnlocked && noteIndex >= 13) confettiUnlocked = true;
+
+    // ── Ring hit (always checked first) ──────────────────────
+    const ringScreenY = ring.y + ring.jerkOffset;
+    if (Math.hypot(px - ring.x, py - ringScreenY) < RING_R + 12) {
+        ring.jerk();
+        keys.forEach(k => k.activate(0.7, 0.025));
+        const { melody, root, completed } = consumeNote();
+        playJingle(melody, 0.28, 0);
+        playJingle(root,   0.18, 0);
+        spawnPraise();
+        if (confettiUnlocked) triggerConfetti();
+        if (completed) { openReward(); resetPraise(); resetConfetti(); }
+        return;
+    }
+
+    // ── Individual key hit(s) ─────────────────────────────────
+    const hitKeys = keys.filter(k => k.containsPoint(px, py));
+    if (hitKeys.length === 0) return;
+
+    hitKeys.forEach(k => k.activate(1.0, 0.030));
+    const { melody, root, completed } = consumeNote();
+    playJingle(melody, 0.28, 0);
+    if (hitKeys.length > 1) playJingle(root, 0.18, 0);
+    spawnPraise();
+    if (confettiUnlocked) triggerConfetti();
+    if (completed) { openReward(); resetPraise(); resetConfetti(); }
+}
+
+canvas.addEventListener('click', e => {
+    const b = canvas.getBoundingClientRect();
+    handleClick(e.clientX - b.left, e.clientY - b.top);
+});
+
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const b = canvas.getBoundingClientRect();
+    const t = e.touches[0];
+    handleClick(t.clientX - b.left, t.clientY - b.top);
+}, { passive: false });
+
+canvas.addEventListener('mousemove', e => {
+    const b  = canvas.getBoundingClientRect();
+    const px = e.clientX - b.left;
+    const py = e.clientY - b.top;
+    const ringScreenY = ring.y + ring.jerkOffset;
+    const over = keys.some(k => k.containsPoint(px, py))
+              || Math.hypot(px - ring.x, py - ringScreenY) < RING_R + 12;
+    canvas.style.cursor = over ? 'pointer' : 'default';
+});
+
+
+// ─────────────────────────────────────────────────────────────
+//  §12  ANIMATION LOOP
+// ─────────────────────────────────────────────────────────────
+
+let lastTs = 0;
+
+function frame(ts) {
+    const dt = lastTs ? Math.min(ts - lastTs, 50) : 16;
+    lastTs = ts;
+
+    ring.update(dt);
+    keys.forEach(k => k.update(dt));
+    updateConfetti(dt);
+
+    drawBackground();
+    keys.forEach(k => k.draw());
+    ring.draw();
+    drawConfetti();
+
+    requestAnimationFrame(frame);
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  §13  INITIALISE & START
+// ─────────────────────────────────────────────────────────────
+
+ring.init();
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
